@@ -176,6 +176,7 @@ diskquota_start_worker(PG_FUNCTION_ARGS)
 	extension_ddl_message->cmd = CMD_CREATE_EXTENSION;
 	extension_ddl_message->result = ERR_PENDING;
 	extension_ddl_message->dbid = MyDatabaseId;
+	extension_ddl_message->handled = MSG_NOT_HANDLED;
 	/* setup sig handler to diskquota launcher process */
 	rc = kill(extension_ddl_message->launcher_pid, SIGUSR1);
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
@@ -204,6 +205,7 @@ diskquota_start_worker(PG_FUNCTION_ARGS)
 	LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_SHARED);
 	if (extension_ddl_message->result != ERR_OK)
 	{
+		extension_ddl_message->handled = MSG_HANDLED_ERR;
 		LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 		LWLockRelease(diskquota_locks.extension_ddl_lock);
 		elog(ERROR, "[diskquota] failed to create diskquota extension: %s", ddl_err_code_to_err_message((MessageResult) extension_ddl_message->result));
@@ -305,6 +307,7 @@ dq_object_access_hook(ObjectAccessType access, Oid classId,
 	extension_ddl_message->cmd = CMD_DROP_EXTENSION;
 	extension_ddl_message->result = ERR_PENDING;
 	extension_ddl_message->dbid = MyDatabaseId;
+	extension_ddl_message->handled = MSG_NOT_HANDLED;
 	rc = kill(extension_ddl_message->launcher_pid, SIGUSR1);
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 	if (rc == 0)
@@ -332,6 +335,7 @@ dq_object_access_hook(ObjectAccessType access, Oid classId,
 	LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_SHARED);
 	if (extension_ddl_message->result != ERR_OK)
 	{
+		extension_ddl_message->handled = MSG_HANDLED_ERR;
 		LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 		LWLockRelease(diskquota_locks.extension_ddl_lock);
 		elog(ERROR, "[diskquota launcher] failed to drop diskquota extension: %s", ddl_err_code_to_err_message((MessageResult) extension_ddl_message->result));

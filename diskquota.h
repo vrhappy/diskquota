@@ -55,12 +55,20 @@ struct ExtensionDDLMessage
 								 * MessageResult */
 	int			dbid;			/* dbid of create/drop diskquota
 								 * extensionstatement */
+	int			handled;		/* flag of create/drop diskquota if already handled */
 };
 
 enum MessageCommand
 {
 	CMD_CREATE_EXTENSION = 1,
 	CMD_DROP_EXTENSION,
+};
+
+enum MessageHanldeStatus
+{
+	MSG_NOT_HANDLED = 0,
+	MSG_HANDLED_OK,
+	MSG_HANDLED_ERR,
 };
 
 enum MessageResult

@@ -682,6 +682,13 @@ process_extension_ddl_message()
 	if (local_extension_ddl_message.req_pid == 0 || local_extension_ddl_message.launcher_pid != MyProcPid)
 		return;
 
+	/* create/drop extension message must not be handled */
+	if (local_extension_ddl_message.handled != MSG_NOT_HANDLED)
+	{
+		ereport(LOG, (errmsg("[diskquota launcher]: received create/drop extension diskquota is handled(result=%d), ignore it!", local_extension_ddl_message.result)));
+		return;
+	}
+
 	ereport(LOG, (errmsg("[diskquota launcher]: received create/drop extension diskquota message")));
 
 	do_process_extension_ddl_message(&code, local_extension_ddl_message);
@@ -691,6 +698,7 @@ process_extension_ddl_message()
 	memset(extension_ddl_message, 0, sizeof(ExtensionDDLMessage));
 	extension_ddl_message->launcher_pid = MyProcPid;
 	extension_ddl_message->result = (int) code;
+	extension_ddl_message->handled = MSG_HANDLED_OK;
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 }
 
