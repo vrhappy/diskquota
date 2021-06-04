@@ -699,6 +699,7 @@ process_extension_ddl_message()
 	extension_ddl_message->launcher_pid = MyProcPid;
 	extension_ddl_message->result = (int) code;
 	extension_ddl_message->handled = MSG_HANDLED_OK;
+	extension_ddl_message->req_pid = local_extension_ddl_message->req_pid; // write back for requester to check the result
 	LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 }
 

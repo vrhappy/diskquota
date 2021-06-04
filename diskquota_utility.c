@@ -194,10 +194,26 @@ diskquota_start_worker(PG_FUNCTION_ARGS)
 				break;
 			ResetLatch(&MyProc->procLatch);
 			LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_SHARED);
-			if (extension_ddl_message->result != ERR_PENDING)
+			if (extension_ddl_message->result != ERR_PENDING && extension_ddl_message->req_pid == MyProcPid)
 			{
 				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 				break;
+			} else if (extension_ddl_message->result != ERR_PENDING && extension_ddl_message->req_pid != MyProcPid)
+			{
+				/* this mean recieved response is for other process sent request to lancher */
+				ereport(WARNING, (errmsg("process(%d) database(%d): launcher response other process, maybe we should try again.", MyProcPid, MyDatabaseId)));
+				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
+				pg_usleep(10);	// give other process chance of get result
+				LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_EXCLUSIVE);
+				extension_ddl_message->req_pid = MyProcPid;
+				extension_ddl_message->cmd = CMD_CREATE_EXTENSION;
+				extension_ddl_message->result = ERR_PENDING;
+				extension_ddl_message->dbid = MyDatabaseId;
+				extension_ddl_message->handled = MSG_NOT_HANDLED;
+				/* setup sig handler to diskquota launcher process */
+				rc = kill(extension_ddl_message->launcher_pid, SIGUSR1);
+				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
+				continue;
 			}
 			LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 		}
@@ -324,10 +340,25 @@ dq_object_access_hook(ObjectAccessType access, Oid classId,
 				break;
 			ResetLatch(&MyProc->procLatch);
 			LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_SHARED);
-			if (extension_ddl_message->result != ERR_PENDING)
+			if (extension_ddl_message->result != ERR_PENDING && extension_ddl_message->req_pid == MyProcPid)
 			{
 				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 				break;
+			} else if (extension_ddl_message->result != ERR_PENDING && extension_ddl_message->req_pid != MyProcPid)
+			{
+				/* this mean recieved response is for other process sent request to lancher */
+				ereport(WARNING, (errmsg("process(%d) database(%d): launcher response other process, maybe we should try again.", MyProcPid, MyDatabaseId)));
+				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
+				pg_usleep(10);	// give other process chance of get result
+				LWLockAcquire(diskquota_locks.extension_ddl_message_lock, LW_EXCLUSIVE);
+				extension_ddl_message->req_pid = MyProcPid;
+				extension_ddl_message->cmd = CMD_DROP_EXTENSION;
+				extension_ddl_message->result = ERR_PENDING;
+				extension_ddl_message->dbid = MyDatabaseId;
+				extension_ddl_message->handled = MSG_NOT_HANDLED;
+				rc = kill(extension_ddl_message->launcher_pid, SIGUSR1);
+				LWLockRelease(diskquota_locks.extension_ddl_message_lock);
+				continue;
 			}
 			LWLockRelease(diskquota_locks.extension_ddl_message_lock);
 		}
